@@ -14,11 +14,17 @@ class Recomender(object):
     def recommend(self):
         #preference = pl.PreferenceList()
         #channel_list = preference.ReadChannelsFromFile('channels.csv')
-        channel_list = ['theverge', 'motortrend', 'voxdotcom']
+        
         youtube = yt.YouTubeApi()
         youtube.get_credentials(self.args)
-        youtube.create_playlist()
-        youtube.populate_playlist(channel_list)
+        if self.args.updateplaylist:
+            channel_list = ['theverge', 'motortrend', 'voxdotcom']
+            youtube.create_playlist()
+            youtube.populate_playlist(channel_list)
+        elif self.args.cleanplaylist:
+            if youtube.has_recomender_playlist():
+                playlist = youtube.find_user_playlist()
+                youtube.delete_watched_videos(playlist)
         
     def __init__(self, args):
         '''

@@ -39,6 +39,9 @@ class YouTubeApi(object):
     
     PLAYLIST_NAME = 'Recommended Videos'
                 
+    def has_recomender_playlist(self):
+        return self.find_user_playlist() is not None
+                
     def find_playlist(self, playlists, name):
         for item in playlists:
             if item['snippet']['title'] == name:
@@ -47,8 +50,10 @@ class YouTubeApi(object):
         return None                    
     
     def find_user_playlist(self):
-        user_playlists = self.get_user_playlists()
-        return self.find_playlist(user_playlists, self.PLAYLIST_NAME)
+        if self.user_playlist_cache is None:
+            user_playlists = self.get_user_playlists()
+            self.user_playlist_cache = self.find_playlist(user_playlists, self.PLAYLIST_NAME)
+        return self.user_playlist_cache
             
     def get_user_playlists(self):
         if not self.user_playlist_cache:
