@@ -11,20 +11,22 @@ class Context(object):
     classdocs
     '''
     def Release(self):
-        self._pbar.update(100)
+        self._pbar.update(self.max_val)
         self._pbar.finish()
     
-    def Update(self):
-        if self._it > 100:
-            self._it = 0
-        else:
-            self._it = self._it + 1
+    def Update(self, new_val):
+        new_val % self.max_val
+        self._it = new_val
         self._pbar.update(self._it)
 
-    def __init__(self):
+    def ShowMessage(self, msg):
+        print(msg)
+
+    def __init__(self, max_val):
         '''
         Constructor
         '''
         self._it = 0
+        self.max_val = max_val
         widgets = [Percentage(), Bar()]
-        self._pbar = ProgressBar(widgets=widgets, maxval=100).start()
+        self._pbar = ProgressBar(widgets=widgets, maxval=max_val).start()

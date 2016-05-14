@@ -11,7 +11,8 @@ import oauth2client.file as a2cfile
 import oauth2client.client as a2cclient
 import oauth2client.tools as a2ctools
 from apiclient.discovery import build
-import json
+
+import context as ct 
 
 import youtube_utilities as utils
 
@@ -81,13 +82,19 @@ class YouTubeApi(object):
         playlist = self.find_user_playlist()
         if playlist is None:
             self.create_playlist()
+            
+        context = ct.Context(len(videos))
         for video in videos:
+            context.Update(videos.index(video))
             if video is not None:
                 self.add_video_to_playlist(video['contentDetails']['videoId'], playlist['id'])
+        context.Release()
+        
             
     def create_playlist(self):
         response = self.find_user_playlist()
         if response is None:
+            print('Creating new user playlist')
             response = self.youtube.playlists().insert(
                 part="snippet,status",
                 body=dict(snippet=dict(title=self.PLAYLIST_NAME,
@@ -95,59 +102,82 @@ class YouTubeApi(object):
                           status=dict(privacyStatus="private"))).execute()
         self.user_playlist_cache = response
         return response
+
     
     def delete_watched_videos(self, playlist):
         user_channel = self.find_user_channel()
         watched_playlist = user_channel['items'][0]['contentDetails']['relatedPlaylists']['watchHistory']
-        video_items_to_watch = self.find_all_video_items(playlist['id'])
+        
+        print('Retrieving videos in user playlist.')
+        user_playlist_video_items = self.find_all_video_items(playlist['id'])
+        
+        print('Retrieving watch history.')
         watched_video_items = self.find_all_video_items(watched_playlist)
         self.watched_video_items_cache = watched_video_items
-        for video_to_watch in video_items_to_watch:
+        
+        print('Cleaning playlist.')
+        context = ct.Context(len(user_playlist_video_items))
+        for video_item in user_playlist_video_items:
+            context.Update(user_playlist_video_items.index(video_item))
             for watched_video in watched_video_items:
-                if video_to_watch['contentDetails']['videoId'] == watched_video['contentDetails']['videoId']:
-                    result = self.remove_item_from_playlist(video_to_watch['id']);
-                    utils.pretty_print(result)
-                    
+                if video_item['contentDetails']['videoId'] == watched_video['contentDetails']['videoId']:
+                    self.remove_item_from_playlist(video_item['id']);
+            
+        context.Release()
         
     def find_channel(self, name):
         return self.youtube.channels().list(forUsername=name, part="contentDetails").execute()
+
 
     def find_user_channel(self):
         return self.youtube.channels().list(mine=True, part="contentDetails").execute()        
 
 
     def find_videos(self, playlistId, videosCountLimit):
+        maxResults = 50
+        context = ct.Context(videosCountLimit)
         videos = self.youtube.playlistItems().list(
                         playlistId=playlistId, 
-                        maxResults=50, 
+                        maxResults=min(videosCountLimit, maxResults), 
                         part="contentDetails").execute()
         video_items = self.filter(videos['items'])
         videosCountLimit = videosCountLimit - len(video_items)
-         
+        
+        context.Update(min(videosCountLimit, videos['pageInfo']['totalResults']))
+        
         while len(video_items) < videosCountLimit and 'nextPageToken' in videos:
             videos = self.youtube.playlistItems().list(
                             playlistId=playlistId, 
-                            maxResults=50, 
+                            maxResults=maxResults, 
                             pageToken=videos['nextPageToken'],
                             part="contentDetails").execute()
             video_items.extend(self.filter(videos['items']))
+            context.Update(min(videosCountLimit, videos['pageInfo']['totalResults']))
+            
+        context.Release()
         return video_items
     
     
     def find_all_video_items(self, playlistId):
+        maxResults = 50
         pageVideos = self.youtube.playlistItems().list(
                         playlistId=playlistId, 
-                        maxResults=50, 
+                        maxResults=maxResults, 
                         part="contentDetails").execute()
                         
+        context = ct.Context(pageVideos['pageInfo']['totalResults'])
+        
         allVideos = pageVideos['items']
         while 'nextPageToken' in pageVideos:
             pageVideos = self.youtube.playlistItems().list(
                         playlistId=playlistId, 
-                        maxResults=50, 
+                        maxResults=maxResults, 
                         pageToken=pageVideos['nextPageToken'],
                         part="contentDetails").execute()
             allVideos.extend(pageVideos['items'])
+            context.Update(len(allVideos))
+            
+        context.Release()
         return allVideos
     
     def add_videos_from_channels(self, channel_names):
@@ -157,6 +187,7 @@ class YouTubeApi(object):
                 raise NotImplemented            
             for items in channel['items']:
                 uploads_playlist = items['contentDetails']['relatedPlaylists']['uploads']
+            print('Processing channel: ' + item + '.')
             channel_videos = self.find_videos(uploads_playlist, 10)
             self.add_videos_to_playlist(channel_videos)
     
@@ -172,6 +203,7 @@ class YouTubeApi(object):
             self.user_playlist_items_cache = self.find_all_video_items(self.user_playlist_cache['id'])
             
         filtered_video_items = []
+        context = ct.Context(len(video_items))
         for video_item in video_items:
             isNew = True
             for watched_video_item in self.watched_video_items_cache:
@@ -186,13 +218,16 @@ class YouTubeApi(object):
             
             if isNew:
                 filtered_video_items.append(video_item)
-                
+            context.Update(video_items.index(video_item))
+             
+        context.Release()   
         return filtered_video_items
     
     def populate_playlist(self, preffered_channels):
         if self.user_playlist_cache is None:
             self.find_user_playlist()
-#         self.delete_watched_videos(self.user_playlist_cache)
+
+        print('Adding videos to user playlist.')
         self.add_videos_from_channels(preffered_channels)
             
     def get_credentials(self, args):

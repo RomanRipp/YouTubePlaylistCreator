@@ -25,6 +25,10 @@ class Recomender(object):
             if youtube.has_recomender_playlist():
                 playlist = youtube.find_user_playlist()
                 youtube.delete_watched_videos(playlist)
+        else:
+            raise NotImplemented
+        
+        print('Succsess')
         
     def __init__(self, args):
         '''
