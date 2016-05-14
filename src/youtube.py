@@ -134,6 +134,7 @@ class YouTubeApi(object):
 
 
     def find_videos(self, playlistId, videosCountLimit):
+        print('Retrieveing videos.')
         maxResults = 50
         context = ct.Context(videosCountLimit)
         videos = self.youtube.playlistItems().list(
@@ -155,6 +156,7 @@ class YouTubeApi(object):
             context.Update(min(videosCountLimit, videos['pageInfo']['totalResults']))
             
         context.Release()
+        print('Filtering videos.')
         return video_items
     
     
@@ -187,8 +189,11 @@ class YouTubeApi(object):
                 raise NotImplemented            
             for items in channel['items']:
                 uploads_playlist = items['contentDetails']['relatedPlaylists']['uploads']
+
             print('Processing channel: ' + item + '.')
             channel_videos = self.find_videos(uploads_playlist, 10)
+    
+            print('Adding videos.')
             self.add_videos_to_playlist(channel_videos)
     
     def filter(self, video_items):
